@@ -1,0 +1,96 @@
+/* AKS Placement Advisor plugin styles */
+
+.aks-placement-advisor-card {
+    padding: 0.5rem;
+}
+
+.aks-placement-advisor-card h6 {
+    color: var(--bs-primary);
+    margin-bottom: 0.5rem;
+}
+
+/* Results table */
+.aks-pa-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.aks-pa-table th,
+.aks-pa-table td {
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.aks-pa-table th {
+    background: var(--bs-tertiary-bg);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.aks-pa-table tr:hover {
+    background: var(--bs-tertiary-bg);
+}
+
+/* Confidence badges */
+.aks-pa-confidence-high {
+    color: var(--bs-success);
+    font-weight: 600;
+}
+
+.aks-pa-confidence-medium {
+    color: var(--bs-warning);
+    font-weight: 600;
+}
+
+.aks-pa-confidence-low {
+    color: var(--bs-danger);
+    font-weight: 600;
+}
+
+/* Score bar */
+.aks-pa-score-bar {
+    display: inline-block;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--bs-primary);
+    vertical-align: middle;
+    margin-right: 0.3rem;
+}
+
+/* Warnings list */
+.aks-pa-warnings {
+    font-size: 0.75rem;
+    color: var(--bs-secondary);
+    margin: 0;
+    padding-left: 1rem;
+}
+
+/* Zone badges */
+.aks-pa-zone-badge {
+    display: inline-block;
+    background: var(--bs-info-bg-subtle);
+    color: var(--bs-info-text-emphasis);
+    border-radius: 0.25rem;
+    padding: 0 0.3rem;
+    font-size: 0.75rem;
+    margin-right: 0.15rem;
+}
+
+/* Empty state */
+.aks-pa-empty {
+    text-align: center;
+    padding: 2rem;
+    color: var(--bs-secondary);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .aks-pa-table th {
+    background: var(--bs-dark-bg-subtle);
+}
+
+[data-theme="dark"] .aks-pa-zone-badge {
+    background: var(--bs-info-bg-subtle);
+    color: var(--bs-info-text-emphasis);
+}

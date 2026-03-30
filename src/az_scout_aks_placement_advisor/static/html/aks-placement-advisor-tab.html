@@ -1,0 +1,57 @@
+<!-- AKS Placement Advisor tab HTML fragment -->
+<div class="aks-placement-advisor-card">
+
+    <!-- Subscription selector -->
+    <div class="mb-3" style="max-width: 400px;">
+        <label for="aks-pa-sub-select" class="form-label form-label-sm">Subscription</label>
+        <select class="form-select form-select-sm" id="aks-pa-sub-select" disabled>
+            <option value="">Select tenant &amp; region first</option>
+        </select>
+    </div>
+
+    <!-- Filters row -->
+    <div class="d-flex gap-3 mb-3 flex-wrap align-items-end">
+        <div>
+            <label for="aks-pa-min-vcpus" class="form-label form-label-sm">Min vCPUs</label>
+            <input type="number" class="form-control form-control-sm" id="aks-pa-min-vcpus"
+                   placeholder="e.g. 2" min="1" style="width: 100px;">
+        </div>
+        <div>
+            <label for="aks-pa-min-memory" class="form-label form-label-sm">Min Memory (GB)</label>
+            <input type="number" class="form-control form-control-sm" id="aks-pa-min-memory"
+                   placeholder="e.g. 4" min="0" step="0.5" style="width: 100px;">
+        </div>
+        <div>
+            <label for="aks-pa-sku-filter" class="form-label form-label-sm">SKU filter</label>
+            <input type="text" class="form-control form-control-sm" id="aks-pa-sku-filter"
+                   placeholder="e.g. D4s" style="width: 140px;">
+        </div>
+        <div class="form-check align-self-end mb-1">
+            <input class="form-check-input" type="checkbox" id="aks-pa-require-zones">
+            <label class="form-check-label form-label-sm" for="aks-pa-require-zones">
+                Require zones
+            </label>
+        </div>
+    </div>
+
+    <!-- Action button -->
+    <button class="btn btn-primary btn-sm" id="aks-pa-btn" disabled>
+        <i class="bi bi-search"></i> Get Recommendations
+    </button>
+
+    <!-- Loading spinner -->
+    <div class="d-none mt-3" id="aks-pa-loading">
+        <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <span class="ms-2 small text-body-secondary">Fetching SKU data...</span>
+    </div>
+
+    <!-- Results table -->
+    <div class="mt-3" id="aks-pa-results"></div>
+
+    <!-- Disclaimer -->
+    <div class="d-none mt-2" id="aks-pa-disclaimer">
+        <p class="text-body-secondary small fst-italic mb-0" id="aks-pa-disclaimer-text"></p>
+    </div>
+</div>
