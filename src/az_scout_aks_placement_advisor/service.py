@@ -253,7 +253,10 @@ def get_recommendations(
         from az_scout.azure_api import get_skus as get_compute_skus
 
         compute_skus = get_compute_skus(
-            region, subscription_id, tenant_id=tenant_id, resource_type="virtualMachines",
+            region,
+            subscription_id,
+            tenant_id=tenant_id,
+            resource_type="virtualMachines",
         )
         restriction_map: dict[str, list[str]] = {}
         for cs in compute_skus:

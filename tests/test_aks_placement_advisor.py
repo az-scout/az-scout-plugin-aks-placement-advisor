@@ -350,7 +350,7 @@ class TestScoring:
         assert isinstance(warnings, list)
 
     def test_restricted_sku_penalised(self) -> None:
-        sku = SAMPLE_SKUS[3]  # Standard_F4s_v2 — has restrictions
+        sku = SAMPLE_SKUS[1]  # Standard_F4s_v2 — has restrictions
         score_restricted, _, _ = score_sku(sku)
         sku_clean = {**sku, "restrictions": []}
         score_clean, _, _ = score_sku(sku_clean)
