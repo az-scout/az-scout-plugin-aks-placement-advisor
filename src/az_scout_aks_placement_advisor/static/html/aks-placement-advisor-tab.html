@@ -1,0 +1,47 @@
+<div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+    <!-- Subscription combobox -->
+    <div id="aks-sub-combobox" class="position-relative" style="min-width:260px;">
+        <input type="hidden" id="aks-sub-select">
+        <input type="text" class="form-control form-control-sm" id="aks-sub-search"
+               placeholder="Select subscription…" autocomplete="off">
+        <ul id="aks-sub-dropdown" class="dropdown-menu w-100" style="max-height:200px;overflow-y:auto;"></ul>
+    </div>
+
+    <!-- Pool type toggle -->
+    <div class="aks-pool-toggle">
+        <input type="radio" name="aks-pool-type" id="aks-pool-system" value="system">
+        <label for="aks-pool-system">System pool</label>
+        <input type="radio" name="aks-pool-type" id="aks-pool-user" value="user">
+        <label for="aks-pool-user">User pool</label>
+    </div>
+
+    <button id="aks-pa-csv-btn" class="btn btn-sm btn-outline-secondary d-none">
+        <i class="bi bi-download me-1"></i>CSV
+    </button>
+
+    <span id="aks-pa-summary"></span>
+</div>
+
+<div class="alert alert-danger d-none" id="aks-pa-error"></div>
+
+<!-- Empty state -->
+<div id="aks-pa-empty" class="text-center text-body-secondary py-5">
+    <i class="bi bi-gpu-card" style="font-size:2rem;opacity:0.5"></i>
+    <p class="mt-2">Select a subscription and choose <strong>System pool</strong> or <strong>User pool</strong> to analyse SKU eligibility for Azure Kubernetes Service (AKS) use.</p>
+</div>
+
+<!-- Loading -->
+<div id="aks-pa-loading" class="d-none text-center py-5">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="mt-2 text-body-secondary">Loading SKUs and checking AKS eligibility…</p>
+</div>
+
+<!-- Results -->
+<div id="aks-pa-results" class="d-none">
+    <div class="table-responsive">
+        <table id="aks-pa-table" class="table table-sm table-hover align-middle sku-table">
+            <thead></thead>
+            <tbody id="aks-pa-tbody"></tbody>
+        </table>
+    </div>
+</div>

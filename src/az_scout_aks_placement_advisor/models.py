@@ -24,11 +24,19 @@ class SkuRecommendation:
     confidence: str
     warnings: list[str] = field(default_factory=list)
     fallback_skus: list[str] = field(default_factory=list)
+    quota_limit: int | None = None
+    quota_used: int | None = None
     # AKS eligibility (from _aks_filter)
     eligibility_status: str = "eligible"  # eligible | warning | ineligible
     eligibility_errors: list[str] = field(default_factory=list)
     eligibility_warnings: list[str] = field(default_factory=list)
     pool_type: str = "system"
+    # Pricing (from enrich_skus_with_prices)
+    pricing_paygo: float | None = None
+    pricing_spot: float | None = None
+    pricing_currency: str = "USD"
+    # Deployment confidence (from enrich_skus_with_confidence)
+    deployment_confidence: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         """Serialise to a JSON-compatible dict with camelCase keys."""
@@ -44,6 +52,8 @@ class SkuRecommendation:
             "vmssSupported": self.vmss_supported,
             "aksCompatible": self.aks_compatible,
             "quotaAvailable": self.quota_available,
+            "quotaLimit": self.quota_limit,
+            "quotaUsed": self.quota_used,
             "score": self.score,
             "confidence": self.confidence,
             "warnings": self.warnings,
@@ -55,6 +65,12 @@ class SkuRecommendation:
                 "errors": self.eligibility_errors,
                 "warnings": self.eligibility_warnings,
             },
+            "pricing": {
+                "paygo": self.pricing_paygo,
+                "spot": self.pricing_spot,
+                "currency": self.pricing_currency,
+            },
+            "deploymentConfidence": self.deployment_confidence,
         }
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 from unittest.mock import patch
 
@@ -200,14 +201,14 @@ class TestRecommendationsValidation:
     def test_invalid_max_results(self) -> None:
         resp = _client.get(
             "/plugins/aks-placement-advisor/recommendations",
-            params={"region": "eastus", "subscription_id": "sub1", "max_results": 0},
+            params={"region": "eastus", "subscriptionId": "sub1", "max_results": -1},
         )
         assert resp.status_code == 422
 
     def test_invalid_min_vcpus(self) -> None:
         resp = _client.get(
             "/plugins/aks-placement-advisor/recommendations",
-            params={"region": "eastus", "subscription_id": "sub1", "min_vcpus": -1},
+            params={"region": "eastus", "subscriptionId": "sub1", "min_vcpus": -1},
         )
         assert resp.status_code == 422
 
@@ -240,7 +241,7 @@ class TestRecommendationsWithMock:
             "/plugins/aks-placement-advisor/recommendations",
             params={
                 "region": "eastus",
-                "subscription_id": "00000000-0000-0000-0000-000000000001",
+                "subscriptionId": "00000000-0000-0000-0000-000000000001",
             },
         )
         assert resp.status_code == 200
@@ -285,7 +286,7 @@ class TestRecommendationsWithMock:
             "/plugins/aks-placement-advisor/recommendations",
             params={
                 "region": "eastus",
-                "subscription_id": "sub1",
+                "subscriptionId": "sub1",
                 "require_zones": True,
             },
         )
@@ -310,7 +311,7 @@ class TestRecommendationsWithMock:
             "/plugins/aks-placement-advisor/recommendations",
             params={
                 "region": "eastus",
-                "subscription_id": "sub1",
+                "subscriptionId": "sub1",
                 "max_results": 2,
             },
         )
@@ -328,7 +329,7 @@ class TestRecommendationsWithMock:
             "/plugins/aks-placement-advisor/recommendations",
             params={
                 "region": "eastus",
-                "subscription_id": "sub1",
+                "subscriptionId": "sub1",
             },
         )
         assert resp.status_code == 502
@@ -419,10 +420,11 @@ class TestMCPTools:
 
         from az_scout_aks_placement_advisor.tools import recommend_aks_skus
 
-        result = recommend_aks_skus(
+        raw = recommend_aks_skus(
             region="eastus",
             subscription_id="sub1",
         )
+        result = json.loads(raw)
         assert "recommendations" in result
         assert "disclaimer" in result
         assert isinstance(result["recommendations"], list)
@@ -440,10 +442,11 @@ class TestMCPTools:
 
         from az_scout_aks_placement_advisor.tools import compare_aks_regions
 
-        result = compare_aks_regions(
+        raw = compare_aks_regions(
             regions=["eastus", "westus2"],
             subscription_id="sub1",
         )
+        result = json.loads(raw)
         assert "results" in result
         assert "disclaimer" in result
         assert result["regionsCompared"] == 2

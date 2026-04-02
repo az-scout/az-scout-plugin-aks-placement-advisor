@@ -24,6 +24,18 @@ from az_scout_aks_placement_advisor.scoring import (
 
 logger = logging.getLogger(__name__)
 
+
+def _serialize_confidence(conf: Any) -> dict[str, Any] | None:
+    """Serialize a DeploymentConfidence pydantic model to a dict, or pass through."""
+    if conf is None:
+        return None
+    if hasattr(conf, "model_dump"):
+        return conf.model_dump()  # type: ignore[no-any-return,union-attr]
+    if isinstance(conf, dict):
+        return conf
+    return None
+
+
 # AKS VM SKUs API version (preview)
 _AKS_VM_SKUS_API_VERSION = "2026-01-02-preview"
 
@@ -44,12 +56,14 @@ def _cache_key(
     min_vcpus: int | None,
     min_memory_gb: float | None,
     sku_name_filter: str | None,
+    pool_type: str = "system",
 ) -> str:
     """Build a deterministic cache key from all query parameters."""
     return (
         f"{region}:{subscription_id}:{tenant_id or ''}:"
         f"z={require_zones}:v={require_vmss}:"
-        f"cpu={min_vcpus}:mem={min_memory_gb}:f={sku_name_filter or ''}"
+        f"cpu={min_vcpus}:mem={min_memory_gb}:f={sku_name_filter or ''}:"
+        f"pool={pool_type}"
     )
 
 
@@ -197,7 +211,7 @@ def get_recommendations(
     min_vcpus: int | None = None,
     min_memory_gb: float | None = None,
     sku_name_filter: str | None = None,
-    max_results: int = 20,
+    max_results: int = 0,
     pool_type: str = "system",
 ) -> list[SkuRecommendation]:
     """Build scored AKS SKU recommendations for a region.
@@ -222,6 +236,7 @@ def get_recommendations(
         min_vcpus,
         min_memory_gb,
         sku_name_filter,
+        pool_type,
     )
     now = time.monotonic()
     cached = _result_cache.get(key)
@@ -229,7 +244,7 @@ def get_recommendations(
         ts, data = cached
         if now - ts < _CACHE_TTL:
             logger.debug("Cache HIT for %s (%d items)", key, len(data))
-            return data[:max_results]
+            return data[:max_results] if max_results else data
 
     # --- Fetch AKS VM SKUs ---
     try:
@@ -296,6 +311,24 @@ def get_recommendations(
     except Exception:
         logger.warning("Quota enrichment failed, continuing without quota data")
 
+    # --- Optional pricing enrichment ---
+    try:
+        from az_scout.azure_api import enrich_skus_with_prices
+
+        enrich_skus_with_prices(skus, region)
+        logger.info("Enriched SKUs with pricing data")
+    except Exception:
+        logger.warning("Pricing enrichment failed, continuing without pricing data")
+
+    # --- Compute deployment confidence (uses quota + pricing signals) ---
+    try:
+        from az_scout.azure_api import enrich_skus_with_confidence
+
+        enrich_skus_with_confidence(skus)
+        logger.info("Computed deployment confidence for %d SKUs", len(skus))
+    except Exception:
+        logger.warning("Confidence scoring failed, continuing without")
+
     # --- Build recommendations ---
     all_names = [s.get("name", "") for s in skus]
     recommendations: list[SkuRecommendation] = []
@@ -329,6 +362,8 @@ def get_recommendations(
 
         eligibility = check_aks_eligibility(sku, pool_type)
 
+        quota_info = sku.get("quota", {})
+
         rec = SkuRecommendation(
             sku_name=sku.get("name", ""),
             region=region,
@@ -341,6 +376,8 @@ def get_recommendations(
             vmss_supported=True,
             aks_compatible=True,
             quota_available=quota_remaining,
+            quota_limit=quota_info.get("limit"),
+            quota_used=quota_info.get("used"),
             score=score_val,
             confidence=confidence,
             warnings=warnings,
@@ -349,6 +386,10 @@ def get_recommendations(
             eligibility_errors=eligibility.errors,
             eligibility_warnings=eligibility.warnings,
             pool_type=pool_type,
+            pricing_paygo=pricing.get("paygo") if (pricing := sku.get("pricing", {})) else None,
+            pricing_spot=pricing.get("spot") if pricing else None,
+            pricing_currency=pricing.get("currency", "USD") if pricing else "USD",
+            deployment_confidence=_serialize_confidence(sku.get("confidence")),
         )
         recommendations.append(rec)
 
@@ -357,7 +398,7 @@ def get_recommendations(
 
     # Store in cache (full list) and return truncated
     _result_cache[key] = (time.monotonic(), recommendations)
-    return recommendations[:max_results]
+    return recommendations[:max_results] if max_results else recommendations
 
 
 # ---------------------------------------------------------------------------

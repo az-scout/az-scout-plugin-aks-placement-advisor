@@ -11,6 +11,7 @@
     // ---- State ----
     let lastSkus = null;
     let currentPoolType = "";
+    let _dataTable = null;
 
     // ---- Shared components ----
     const C = window.azScout && window.azScout.components ? window.azScout.components : {};
@@ -23,6 +24,7 @@
      * table renderer expects (matching SkuDict + aks eligibility).
      */
     function _normalizeRec(rec) {
+        const p = rec.pricing || {};
         return {
             name: rec.skuName || "",
             family: rec.family || "",
@@ -33,8 +35,17 @@
                 vCPUs: String(rec.vcpus || ""),
                 MemoryGB: String(rec.memoryGb || ""),
             },
-            quota: rec.quotaAvailable != null ? { remaining: rec.quotaAvailable } : {},
-            confidence: rec.confidence ? { score: rec.score, label: rec.confidence } : null,
+            quota: {
+                limit: rec.quotaLimit != null ? rec.quotaLimit : null,
+                used: rec.quotaUsed != null ? rec.quotaUsed : null,
+                remaining: rec.quotaAvailable != null ? rec.quotaAvailable : null,
+            },
+            pricing: (p.paygo != null || p.spot != null) ? p : null,
+            // Use full deployment confidence from enrich_skus_with_confidence
+            // (includes quota pressure, price pressure signals)
+            confidence: rec.deploymentConfidence || null,
+            heuristicScore: rec.score,
+            heuristicConfidence: rec.confidence,
             aks: rec.aks || {},
             fallbackSkus: rec.fallbackSkus || [],
         };
@@ -143,14 +154,17 @@
     }
 
     function initPoolToggle() {
-        const btns = document.querySelectorAll('[name="aks-pool-type"]');
-        btns.forEach(function (btn) {
-            btn.addEventListener("change", function () {
-                currentPoolType = btn.value;
-                document.querySelectorAll('.aks-pool-toggle label').forEach(function (l) {
-                    l.classList.remove('active');
-                });
-                btn.nextElementSibling.classList.add('active');
+        // Use click on labels (not change on hidden radios) for reliability
+        const labels = document.querySelectorAll('.aks-pool-toggle label');
+        labels.forEach(function (label) {
+            label.addEventListener("click", function () {
+                const radio = document.getElementById(label.getAttribute("for"));
+                if (!radio || radio.disabled) return;
+                radio.checked = true;
+                currentPoolType = radio.value;
+                labels.forEach(function (l) { l.classList.remove("active"); });
+                label.classList.add("active");
+
                 loadSkus();
             });
         });
@@ -171,15 +185,18 @@
 
         showPanel("aks-pa", "loading");
         hideError("aks-pa-error");
+        // Hide summary and CSV button during loading
+        const summaryEl = el("aks-pa-summary");
+        if (summaryEl) summaryEl.innerHTML = "";
+        const csvBtnEl = el("aks-pa-csv-btn");
+        if (csvBtnEl) csvBtnEl.classList.add("d-none");
 
         try {
-            const data = await apiFetch(
-                "/plugins/aks-placement-advisor/recommendations?region=" + encodeURIComponent(region) +
-                "&subscription_id=" + encodeURIComponent(sub) +
+            const url = "/plugins/aks-placement-advisor/recommendations?region=" + encodeURIComponent(region) +
+                "&subscriptionId=" + encodeURIComponent(sub) +
                 "&pool_type=" + encodeURIComponent(currentPoolType) +
-                "&max_results=200" +
-                tenantQS("&")
-            );
+                tenantQS("&");
+            const data = await apiFetch(url);
             lastSkus = (data.recommendations || []).map(_normalizeRec);
             renderResults(lastSkus);
             showPanel("aks-pa", "results");
@@ -191,9 +208,21 @@
 
     // ---- Render results table ----
     function renderResults(skus) {
+        // Destroy existing DataTable before re-rendering (restores original DOM)
+        if (_dataTable) {
+            _dataTable.destroy();
+            _dataTable = null;
+        }
+
         const tableEl = el("aks-pa-table");
-        const tbody = el("aks-pa-tbody");
-        if (!tbody || !tableEl) return;
+        if (!tableEl) return;
+        // Ensure tbody exists (may have been removed by DataTable destroy)
+        let tbody = tableEl.querySelector("tbody");
+        if (!tbody) {
+            tbody = document.createElement("tbody");
+            tbody.id = "aks-pa-tbody";
+            tableEl.appendChild(tbody);
+        }
 
         // Remove any existing filter row before re-rendering
         const oldFilter = tableEl.querySelector(".datatable-filter-row");
@@ -253,7 +282,7 @@
                 }).join("");
             }
 
-            // Confidence badge
+            // Confidence badge — prefer deployment confidence, fall back to heuristic
             let confHtml = "\u2014";
             let confSort = -1;
             if (sku.confidence && sku.confidence.score != null) {
@@ -262,6 +291,14 @@
                     confHtml = C.renderConfidenceBadge(sku.confidence);
                 } else {
                     confHtml = escapeHtml(sku.confidence.score + " " + (sku.confidence.label || ""));
+                }
+            } else if (sku.heuristicScore != null) {
+                confSort = sku.heuristicScore;
+                const hConf = { score: sku.heuristicScore, label: sku.heuristicConfidence || "" };
+                if (C.renderConfidenceBadge) {
+                    confHtml = C.renderConfidenceBadge(hConf);
+                } else {
+                    confHtml = escapeHtml(sku.heuristicScore + " " + (sku.heuristicConfidence || ""));
                 }
             }
 
@@ -290,6 +327,42 @@
         }
 
         tbody.innerHTML = html;
+
+        // Update summary immediately from the data (before DOM manipulation by DataTables)
+        const countByStatus = { eligible: 0, warning: 0, ineligible: 0 };
+        skus.forEach(function (s) { const st = (s.aks || {}).status || "ineligible"; countByStatus[st] = (countByStatus[st] || 0) + 1; });
+        const summary = el("aks-pa-summary");
+        if (summary) {
+            summary.innerHTML =
+                '<span class="badge bg-success me-1">' + countByStatus.eligible + ' eligible</span>' +
+                '<span class="badge bg-warning text-dark me-1">' + countByStatus.warning + ' warning</span>' +
+                '<span class="badge bg-danger me-1">' + countByStatus.ineligible + ' ineligible</span>' +
+                ' <span class="text-body-secondary">/ ' + skus.length + ' total (' + escapeHtml(poolType) + ' pool)</span>';
+        }
+        const csvBtn = el("aks-pa-csv-btn");
+        if (csvBtn) csvBtn.classList.remove("d-none");
+
+        // Init Simple-DataTables for column sorting
+        // Cols: 0=Status, 1=Name, 2=Series, 3=vCPUs, 4=Memory, 5=QLimit, 6=QUsed, 7=QRem, 8=Confidence
+        const confCol = 8;
+        const colConfig = [
+            { select: [3, 4, 5, 6, 7], type: "number" },
+            { select: confCol, type: "number" },
+        ];
+        let nextCol = confCol + 1;
+        if (showPricing) {
+            colConfig.push({ select: [nextCol, nextCol + 1], type: "number" });
+            nextCol += 2;
+        }
+        if (typeof simpleDatatables !== "undefined") {
+            if (_dataTable) _dataTable.destroy();
+            _dataTable = new simpleDatatables.DataTable(tableEl, {
+                searchable: false,
+                paging: false,
+                labels: { noRows: "No SKUs match", info: "{rows} SKUs" },
+                columns: colConfig,
+            });
+        }
 
         // Build column filters using shared component
         // Cols: 0=Status, 1=Name, 2=Series, 3=vCPUs, 4=Memory, 5=QLimit, 6=QUsed, 7=QRem, 8=Confidence
@@ -342,21 +415,6 @@
             });
         });
 
-        // Update summary
-        const countByStatus = { eligible: 0, warning: 0, ineligible: 0 };
-        skus.forEach(function (s) { const st = (s.aks || {}).status || "ineligible"; countByStatus[st] = (countByStatus[st] || 0) + 1; });
-        const summary = el("aks-pa-summary");
-        if (summary) {
-            summary.innerHTML =
-                '<span class="badge bg-success me-1">' + countByStatus.eligible + ' eligible</span>' +
-                '<span class="badge bg-warning text-dark me-1">' + countByStatus.warning + ' warning</span>' +
-                '<span class="badge bg-danger me-1">' + countByStatus.ineligible + ' ineligible</span>' +
-                ' <span class="text-body-secondary">/ ' + skus.length + ' total (' + escapeHtml(poolType) + ' pool)</span>';
-        }
-
-        // CSV button visibility
-        const csvBtn = el("aks-pa-csv-btn");
-        if (csvBtn) csvBtn.classList.remove("d-none");
     }
 
     // ---- SKU detail modal (delegates to shared component) ----
@@ -426,10 +484,8 @@
                 sku.series || "",
                 caps.vCPUs || "",
                 caps.MemoryGB || "",
-                quota.limit != null ? quota.limit : "",
-                quota.used != null ? quota.used : "",
                 quota.remaining != null ? quota.remaining : "",
-                conf.score != null ? conf.score + " (" + (conf.label || "") + ")" : "",
+                sku.heuristicScore != null ? sku.heuristicScore + " (" + (sku.heuristicConfidence || "") + ")" : "",
                 pricing.paygo != null ? pricing.paygo : "",
                 pricing.spot != null ? pricing.spot : "",
                 (sku.zones || []).join("; "),
@@ -444,60 +500,19 @@
 
     // ---- Init ----
     function init() {
-        // Inject tab HTML into the plugin container
         const container = el("plugin-tab-aks-placement-advisor");
-        if (container) {
-            container.innerHTML = `
-                <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
-                    <!-- Subscription combobox -->
-                    <div id="aks-sub-combobox" class="position-relative" style="min-width:260px;">
-                        <input type="hidden" id="aks-sub-select">
-                        <input type="text" class="form-control form-control-sm" id="aks-sub-search"
-                               placeholder="Select subscription\u2026" autocomplete="off">
-                        <ul id="aks-sub-dropdown" class="dropdown-menu w-100" style="max-height:200px;overflow-y:auto;"></ul>
-                    </div>
+        if (!container) return;
 
-                    <!-- Pool type toggle -->
-                    <div class="aks-pool-toggle">
-                        <input type="radio" name="aks-pool-type" id="aks-pool-system" value="system">
-                        <label for="aks-pool-system">System pool</label>
-                        <input type="radio" name="aks-pool-type" id="aks-pool-user" value="user">
-                        <label for="aks-pool-user">User pool</label>
-                    </div>
+        // Load tab HTML from static fragment
+        fetch("/plugins/aks-placement-advisor/static/html/aks-placement-advisor-tab.html")
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                container.innerHTML = html;
+                _initAfterLoad();
+            });
+    }
 
-                    <button id="aks-pa-csv-btn" class="btn btn-sm btn-outline-secondary d-none">
-                        <i class="bi bi-download me-1"></i>CSV
-                    </button>
-
-                    <span id="aks-pa-summary"></span>
-                </div>
-
-                <div class="alert alert-danger d-none" id="aks-pa-error"></div>
-
-                <!-- Empty state -->
-                <div id="aks-pa-empty" class="text-center text-body-secondary py-5">
-                    <i class="bi bi-gpu-card" style="font-size:2rem;opacity:0.5"></i>
-                    <p class="mt-2">Select a subscription and choose <strong>System pool</strong> or <strong>User pool</strong> to analyse SKU eligibility for Azure Kubernetes Service (AKS) use.</p>
-                </div>
-
-                <!-- Loading -->
-                <div id="aks-pa-loading" class="d-none text-center py-5">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="mt-2 text-body-secondary">Loading SKUs and checking AKS eligibility\u2026</p>
-                </div>
-
-                <!-- Results -->
-                <div id="aks-pa-results" class="d-none">
-                    <div class="table-responsive">
-                        <table id="aks-pa-table" class="table table-sm table-hover align-middle sku-table">
-                            <thead></thead>
-                            <tbody id="aks-pa-tbody"></tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-        }
-
+    function _initAfterLoad() {
         initSubCombobox();
         initPoolToggle();
         renderSubDropdown("");

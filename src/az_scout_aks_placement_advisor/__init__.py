@@ -53,7 +53,7 @@ class AksPlacementAdvisorPlugin:
         return [
             TabDefinition(
                 id="aks-placement-advisor",
-                label="AKS Placement",
+                label="AKS SKUs",
                 icon="bi bi-diagram-3",
                 js_entry="js/aks-placement-advisor-tab.js",
                 css_entry="css/aks-placement-advisor.css",

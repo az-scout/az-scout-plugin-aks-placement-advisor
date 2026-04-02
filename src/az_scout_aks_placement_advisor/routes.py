@@ -6,7 +6,7 @@ import asyncio
 from typing import Any
 
 from az_scout.plugin_api import PluginValidationError
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from az_scout_aks_placement_advisor.models import DISCLAIMER
 
@@ -37,16 +37,16 @@ async def regions(
 
 @router.get("/recommendations")
 async def recommendations(
-    region: str,
-    tenant_id: str | None = None,
-    subscription_id: str | None = None,
-    require_zones: bool = False,
-    require_vmss: bool = True,
-    min_vcpus: int | None = None,
-    min_memory_gb: float | None = None,
-    sku_name_filter: str | None = None,
-    max_results: int = 20,
-    pool_type: str = "system",
+    region: str = Query(...),
+    tenant_id: str | None = Query(None, alias="tenantId"),
+    subscription_id: str | None = Query(None, alias="subscriptionId"),
+    require_zones: bool = Query(False),
+    require_vmss: bool = Query(True),
+    min_vcpus: int | None = Query(None),
+    min_memory_gb: float | None = Query(None),
+    sku_name_filter: str | None = Query(None),
+    max_results: int = Query(0),
+    pool_type: str = Query("system"),
 ) -> dict[str, Any]:
     """Return scored AKS SKU recommendations for a region.
 
@@ -54,8 +54,8 @@ async def recommendations(
     """
     if not region:
         raise PluginValidationError("region is required")
-    if max_results < 1 or max_results > 200:
-        raise PluginValidationError("max_results must be between 1 and 200")
+    if max_results < 0 or max_results > 2000:
+        raise PluginValidationError("max_results must be between 0 and 2000")
     if min_vcpus is not None and min_vcpus < 1:
         raise PluginValidationError("min_vcpus must be >= 1")
     if min_memory_gb is not None and min_memory_gb < 0:

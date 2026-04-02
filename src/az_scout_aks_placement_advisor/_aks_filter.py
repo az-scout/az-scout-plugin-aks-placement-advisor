@@ -24,6 +24,7 @@ def _parse_series(sku_name: str) -> str:
     m = _SERIES_RE.match(sku_name)
     return m.group(1).upper() if m else ""
 
+
 # Series blocked for all AKS node pool types.
 _BLOCKED_SERIES: frozenset[str] = frozenset({"A"})
 

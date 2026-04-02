@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
-from az_scout_aks_placement_advisor._aks_filter import EligibilityResult, annotate_skus, check_aks_eligibility
+from az_scout_aks_placement_advisor._aks_filter import (
+    EligibilityResult,
+    annotate_skus,
+    check_aks_eligibility,
+)
 
 
 def _make_sku(
@@ -53,17 +55,13 @@ class TestSystemPool:
         assert result.warnings == []
 
     def test_b_series_blocked(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(name="Standard_B2s"), "system", series="B"
-        )
+        result = check_aks_eligibility(_make_sku(name="Standard_B2s"), "system", series="B")
         assert result.status == "ineligible"
         assert not result.eligible
         assert any("burstable" in e.lower() for e in result.errors)
 
     def test_a_series_blocked(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(name="Standard_A2_v2"), "system", series="A"
-        )
+        result = check_aks_eligibility(_make_sku(name="Standard_A2_v2"), "system", series="A")
         assert not result.eligible
         assert any("A-series" in e for e in result.errors)
 
@@ -75,52 +73,38 @@ class TestSystemPool:
         assert any("Promo" in e for e in result.errors)
 
     def test_1_vcpu_blocked(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(vcpus="1"), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(vcpus="1"), "system", series="D")
         assert not result.eligible
         assert any("vCPUs" in e for e in result.errors)
 
     def test_low_memory_blocked(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(memory_gb="2"), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(memory_gb="2"), "system", series="D")
         assert not result.eligible
         assert any("RAM" in e for e in result.errors)
 
     def test_no_premium_io_blocked(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(premium_io="False"), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(premium_io="False"), "system", series="D")
         assert not result.eligible
         assert any("Premium" in e for e in result.errors)
 
     def test_no_zones_blocked(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(zones=[]), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(zones=[]), "system", series="D")
         assert not result.eligible
         assert any("zone" in e.lower() for e in result.errors)
 
     def test_no_accel_net_warning(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(accel_net="False"), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(accel_net="False"), "system", series="D")
         assert result.status == "warning"  # not eligible, not ineligible
         assert result.eligible  # still eligible (warnings only)
         assert any("Accelerated" in w for w in result.warnings)
 
     def test_no_ephemeral_warning(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(ephemeral="False"), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(ephemeral="False"), "system", series="D")
         assert result.eligible
         assert any("Ephemeral" in w for w in result.warnings)
 
     def test_zone_restrictions_warning(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(restrictions=["2"]), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(restrictions=["2"]), "system", series="D")
         assert result.eligible
         assert any("restriction" in w.lower() for w in result.warnings)
 
@@ -129,24 +113,18 @@ class TestUserPool:
     """User pool eligibility rules."""
 
     def test_b_series_allowed_with_warning(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(name="Standard_B2s"), "user", series="B"
-        )
+        result = check_aks_eligibility(_make_sku(name="Standard_B2s"), "user", series="B")
         assert result.status == "warning"
         assert result.eligible
         assert any("burstable" in w.lower() for w in result.warnings)
 
     def test_no_premium_io_warning(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(premium_io="False"), "user", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(premium_io="False"), "user", series="D")
         assert result.eligible  # warning for user pool
         assert any("Premium" in w for w in result.warnings)
 
     def test_a_series_still_blocked(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(name="Standard_A2_v2"), "user", series="A"
-        )
+        result = check_aks_eligibility(_make_sku(name="Standard_A2_v2"), "user", series="A")
         assert not result.eligible
 
     def test_standard_e_series_eligible(self) -> None:
@@ -213,9 +191,7 @@ class TestVmssChecks:
     """VMSS-specific eligibility checks."""
 
     def test_gen1_only_warning(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(hyper_v="V1"), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(hyper_v="V1"), "system", series="D")
         assert result.status == "warning"
         assert any("Gen1" in w for w in result.warnings)
 
@@ -227,35 +203,25 @@ class TestVmssChecks:
         assert any("Trusted Launch" in w for w in result.warnings)
 
     def test_no_spot_capability_warning_user_pool(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(low_priority="False"), "user", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(low_priority="False"), "user", series="D")
         assert result.status == "warning"
         assert any("Spot" in w for w in result.warnings)
 
     def test_no_spot_capability_no_warning_system_pool(self) -> None:
         """System pools can't be Spot anyway, so no warning."""
-        result = check_aks_eligibility(
-            _make_sku(low_priority="False"), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(low_priority="False"), "system", series="D")
         assert not any("Spot" in w for w in result.warnings)
 
     def test_no_host_encryption_warning(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(encryption_at_host="False"), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(encryption_at_host="False"), "system", series="D")
         assert result.status == "warning"
         assert any("encryption" in w.lower() for w in result.warnings)
 
     def test_arm64_architecture_warning(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(cpu_arch="Arm64"), "user", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(cpu_arch="Arm64"), "user", series="D")
         assert result.status == "warning"
         assert any("ARM64" in w for w in result.warnings)
 
     def test_x64_no_arch_warning(self) -> None:
-        result = check_aks_eligibility(
-            _make_sku(cpu_arch="x64"), "system", series="D"
-        )
+        result = check_aks_eligibility(_make_sku(cpu_arch="x64"), "system", series="D")
         assert not any("ARM64" in w for w in result.warnings)
