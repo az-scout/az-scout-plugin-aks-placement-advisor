@@ -9,7 +9,7 @@ description = "AKS Placement Advisor plugin for az-scout — evaluates and recom
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "az-scout",
+    "az-scout>=2026.4.1",
     "fastapi",
 ]
 
