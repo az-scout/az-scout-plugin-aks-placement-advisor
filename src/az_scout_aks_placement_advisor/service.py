@@ -30,7 +30,7 @@ def _serialize_confidence(conf: Any) -> dict[str, Any] | None:
     if conf is None:
         return None
     if hasattr(conf, "model_dump"):
-        return conf.model_dump()  # type: ignore[no-any-return,union-attr]
+        return conf.model_dump()  # type: ignore[no-any-return]
     if isinstance(conf, dict):
         return conf
     return None
@@ -322,7 +322,7 @@ def get_recommendations(
 
     # --- Compute deployment confidence (uses quota + pricing signals) ---
     try:
-        from az_scout.azure_api import enrich_skus_with_confidence
+        from az_scout.scoring.deployment_confidence import enrich_skus_with_confidence
 
         enrich_skus_with_confidence(skus)
         logger.info("Computed deployment confidence for %d SKUs", len(skus))
