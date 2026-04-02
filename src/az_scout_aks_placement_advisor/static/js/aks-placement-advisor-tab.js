@@ -46,6 +46,8 @@
             confidence: rec.deploymentConfidence || null,
             heuristicScore: rec.score,
             heuristicConfidence: rec.confidence,
+            heuristicWarnings: rec.warnings || [],
+            scoreBreakdown: rec.scoreBreakdown || [],
             aks: rec.aks || {},
             fallbackSkus: rec.fallbackSkus || [],
         };
@@ -243,7 +245,7 @@
 
         // Build thead
         const headers = ["Status", "SKU Name", "Series", "vCPUs", "Memory (GB)",
-            "Quota Limit", "Quota Used", "Quota Rem.", "Confidence"];
+            "Quota Limit", "Quota Used", "Quota Rem.", "Confidence", "AKS Score"];
         if (showPricing) headers.push("PAYGO " + escapeHtml(priceCurrency) + "/h", "Spot " + escapeHtml(priceCurrency) + "/h");
         headers.push("Zones", "Issues");
 
@@ -282,7 +284,7 @@
                 }).join("");
             }
 
-            // Confidence badge — prefer deployment confidence, fall back to heuristic
+            // Deployment confidence badge (no fallback to heuristic)
             let confHtml = "\u2014";
             let confSort = -1;
             if (sku.confidence && sku.confidence.score != null) {
@@ -292,13 +294,18 @@
                 } else {
                     confHtml = escapeHtml(sku.confidence.score + " " + (sku.confidence.label || ""));
                 }
-            } else if (sku.heuristicScore != null) {
-                confSort = sku.heuristicScore;
+            }
+
+            // Heuristic score badge (separate column)
+            let scoreHtml = "\u2014";
+            let scoreSort = -1;
+            if (sku.heuristicScore != null) {
+                scoreSort = sku.heuristicScore;
                 const hConf = { score: sku.heuristicScore, label: sku.heuristicConfidence || "" };
                 if (C.renderConfidenceBadge) {
-                    confHtml = C.renderConfidenceBadge(hConf);
+                    scoreHtml = C.renderConfidenceBadge(hConf);
                 } else {
-                    confHtml = escapeHtml(sku.heuristicScore + " " + (sku.heuristicConfidence || ""));
+                    scoreHtml = escapeHtml(sku.heuristicScore + " " + (sku.heuristicConfidence || ""));
                 }
             }
 
@@ -316,6 +323,7 @@
             html += '<td>' + (quota.used != null ? quota.used : "\u2014") + '</td>';
             html += '<td>' + (quota.remaining != null ? quota.remaining : "\u2014") + '</td>';
             html += '<td data-sort="' + confSort + '">' + confHtml + '</td>';
+            html += '<td data-sort="' + scoreSort + '">' + scoreHtml + '</td>';
             if (showPricing) {
                 const pricing = sku.pricing || {};
                 html += '<td class="price-cell">' + (pricing.paygo != null ? formatNum(pricing.paygo, 4) : "\u2014") + '</td>';
@@ -343,13 +351,14 @@
         if (csvBtn) csvBtn.classList.remove("d-none");
 
         // Init Simple-DataTables for column sorting
-        // Cols: 0=Status, 1=Name, 2=Series, 3=vCPUs, 4=Memory, 5=QLimit, 6=QUsed, 7=QRem, 8=Confidence
+        // Cols: 0=Status, 1=Name, 2=Series, 3=vCPUs, 4=Memory, 5=QLimit, 6=QUsed, 7=QRem, 8=Confidence, 9=AKS Score
         const confCol = 8;
+        const scoreCol = 9;
         const colConfig = [
             { select: [3, 4, 5, 6, 7], type: "number" },
-            { select: confCol, type: "number" },
+            { select: [confCol, scoreCol], type: "number" },
         ];
-        let nextCol = confCol + 1;
+        let nextCol = scoreCol + 1;
         if (showPricing) {
             colConfig.push({ select: [nextCol, nextCol + 1], type: "number" });
             nextCol += 2;
@@ -365,14 +374,14 @@
         }
 
         // Build column filters using shared component
-        // Cols: 0=Status, 1=Name, 2=Series, 3=vCPUs, 4=Memory, 5=QLimit, 6=QUsed, 7=QRem, 8=Confidence
+        // Cols: 0=Status, 1=Name, 2=Series, 3=vCPUs, 4=Memory, 5=QLimit, 6=QUsed, 7=QRem, 8=Confidence, 9=AKS Score
         // Status (col 0) uses a custom <select> instead of text filter
-        const filterableCols = [1, 2, 3, 4, 5, 6, 7, 8];
-        const numericCols = new Set([3, 4, 5, 6, 7, 8]);
+        const filterableCols = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+        const numericCols = new Set([3, 4, 5, 6, 7, 8, 9]);
         if (showPricing) {
-            filterableCols.push(9, 10); // PAYGO, Spot
-            numericCols.add(9);
+            filterableCols.push(10, 11); // PAYGO, Spot
             numericCols.add(10);
+            numericCols.add(11);
         }
         if (C.buildColumnFilters) {
             const filterRow = C.buildColumnFilters(tableEl, filterableCols, numericCols);
@@ -408,11 +417,10 @@
             }
         }
 
-        // SKU detail click handler
-        tbody.querySelectorAll('[data-action="detail"]').forEach(function (btn) {
-            btn.addEventListener("click", function () {
-                openSkuDetail(btn.dataset.sku);
-            });
+        // SKU detail click handler (delegated so it survives DataTable re-renders)
+        tableEl.addEventListener("click", function (e) {
+            const btn = e.target.closest('[data-action="detail"]');
+            if (btn && btn.dataset.sku) openSkuDetail(btn.dataset.sku);
         });
 
     }
@@ -424,7 +432,7 @@
             region: el("region-select").value,
             subscriptionId: el("aks-sub-select").value,
             enrichedSku: enriched,
-            extraSections: function (_data, _enriched) {
+            prependSections: function (_data, _enriched) {
                 return _renderAksEligibilitySection(_enriched);
             },
         });
@@ -438,9 +446,12 @@
             warning: '<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>Warning</span>',
             ineligible: '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Ineligible</span>',
         };
+
         let body = '';
-        body += '<div class="vm-profile-row"><span class="vm-profile-label">Status</span><span>' + (statusBadges[aks.status] || "") + '</span></div>';
-        body += '<div class="vm-profile-row"><span class="vm-profile-label">Pool Type</span><span>' + escapeHtml(aks.pool_type || "") + '</span></div>';
+
+        // --- Eligibility ---
+        const poolLabel = aks.pool_type ? ' <span class="text-body-secondary small ms-2">(' + escapeHtml(aks.pool_type) + ' pool)</span>' : '';
+        body += '<div class="vm-profile-row"><span class="vm-profile-label">Status</span><span>' + (statusBadges[aks.status] || "") + poolLabel + '</span></div>';
         if (aks.errors && aks.errors.length) {
             aks.errors.forEach(function (e) {
                 body += '<div class="vm-profile-row"><span class="vm-profile-label text-danger">Error</span><span class="small">' + escapeHtml(e) + '</span></div>';
@@ -451,18 +462,64 @@
                 body += '<div class="vm-profile-row"><span class="vm-profile-label text-warning">Warning</span><span class="small">' + escapeHtml(w) + '</span></div>';
             });
         }
-        return _accordion("aksEligibility", "bi-gpu-card", "AKS Node Pool Eligibility", body);
+
+        // --- AKS Score ---
+        const score = enriched.heuristicScore;
+        if (score != null) {
+            let confBadgeHtml = "";
+            const hConf = { score: score, label: enriched.heuristicConfidence || "" };
+            if (C.renderConfidenceBadge) {
+                confBadgeHtml = C.renderConfidenceBadge(hConf);
+            } else {
+                confBadgeHtml = escapeHtml(score + " " + (enriched.heuristicConfidence || ""));
+            }
+            body += '<div class="vm-profile-row"><span class="vm-profile-label">AKS Score</span><span>' + confBadgeHtml + '</span></div>';
+
+            const breakdown = enriched.scoreBreakdown || [];
+            if (breakdown.length) {
+                body += '<div class="px-2 pt-1 pb-2 d-flex flex-wrap gap-1">';
+                for (const item of breakdown) {
+                    const pts = item.points;
+                    const applied = item.applied;
+                    const isBonus = pts > 0;
+                    const sign = isBonus ? "+" : "\u2212";
+                    const absVal = Math.abs(pts);
+                    if (applied) {
+                        const cls = isBonus ? 'bg-success bg-opacity-25 text-success-emphasis' : 'bg-danger bg-opacity-25 text-danger-emphasis';
+                        body += '<span class="badge ' + cls + '">';
+                        body += '<i class="bi ' + (isBonus ? 'bi-check-lg' : 'bi-x-lg') + ' me-1"></i>';
+                        body += escapeHtml(item.label) + ' ' + sign + escapeHtml(String(absVal));
+                        body += '</span>';
+                    } else {
+                        body += '<span class="badge bg-secondary bg-opacity-10 text-body-tertiary">';
+                        body += escapeHtml(item.label) + ' ' + sign + escapeHtml(String(absVal));
+                        body += '</span>';
+                    }
+                }
+                body += '</div>';
+            }
+
+            const warnings = enriched.heuristicWarnings || [];
+            if (warnings.length) {
+                warnings.forEach(function (w) {
+                    body += '<div class="vm-profile-row"><span class="vm-profile-label text-warning">Note</span><span class="small">' + escapeHtml(w) + '</span></div>';
+                });
+            }
+        }
+
+        return _accordion("aksAssessment", "bi-gpu-card", "AKS Assessment", body, true);
     }
 
     // Expose _accordion helper locally (mirrors shared component pattern)
-    function _accordion(id, icon, title, body) {
+    function _accordion(id, icon, title, body, expanded) {
+        const isOpen = expanded ? true : false;
         return '<div class="accordion mt-3" id="' + id + 'Accordion">' +
             '<div class="accordion-item">' +
             '<h2 class="accordion-header">' +
-            '<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#' + id + 'Panel" aria-expanded="false">' +
+            '<button class="accordion-button' + (isOpen ? '' : ' collapsed') + '" type="button" data-bs-toggle="collapse" data-bs-target="#' + id + 'Panel" aria-expanded="' + isOpen + '">' +
             '<i class="bi ' + icon + ' me-2"></i>' + escapeHtml(title) +
             '</button></h2>' +
-            '<div id="' + id + 'Panel" class="accordion-collapse collapse">' +
+            '<div id="' + id + 'Panel" class="accordion-collapse collapse' + (isOpen ? ' show' : '') + '">' +
             '<div class="accordion-body p-2">' + body + '</div></div></div></div>';
     }
 
@@ -471,7 +528,7 @@
         if (!lastSkus) return;
         const rows = [["Status", "SKU", "Series", "vCPUs", "Memory (GB)",
             "Quota Limit", "Quota Used", "Quota Remaining",
-            "Confidence", "PAYGO/h", "Spot/h", "Zones", "Errors", "Warnings"]];
+            "Confidence", "AKS Score", "PAYGO/h", "Spot/h", "Zones", "Errors", "Warnings"]];
         for (const sku of lastSkus) {
             const aks = sku.aks || {};
             const caps = sku.capabilities || {};
@@ -479,12 +536,15 @@
             const pricing = sku.pricing || {};
             const conf = sku.confidence || {};
             rows.push([
-                aks.eligible ? "Eligible" : "Ineligible",
+                aks.status || "ineligible",
                 sku.name || "",
                 sku.series || "",
                 caps.vCPUs || "",
                 caps.MemoryGB || "",
+                quota.limit != null ? quota.limit : "",
+                quota.used != null ? quota.used : "",
                 quota.remaining != null ? quota.remaining : "",
+                conf.score != null ? conf.score + " (" + (conf.label || "") + ")" : "",
                 sku.heuristicScore != null ? sku.heuristicScore + " (" + (sku.heuristicConfidence || "") + ")" : "",
                 pricing.paygo != null ? pricing.paygo : "",
                 pricing.spot != null ? pricing.spot : "",

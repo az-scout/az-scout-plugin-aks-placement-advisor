@@ -346,7 +346,7 @@ def get_recommendations(
         family = sku.get("family", "")
         quota_remaining = quota_map.get(family)
 
-        score_val, confidence, warnings = score_sku(
+        score_val, confidence, warnings, breakdown = score_sku(
             sku,
             require_zones=require_zones,
             require_vmss=require_vmss,
@@ -381,6 +381,7 @@ def get_recommendations(
             score=score_val,
             confidence=confidence,
             warnings=warnings,
+            score_breakdown=breakdown,
             fallback_skus=fallbacks,
             eligibility_status=eligibility.status,
             eligibility_errors=eligibility.errors,

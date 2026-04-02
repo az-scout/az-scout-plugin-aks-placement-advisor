@@ -102,8 +102,8 @@ def score_sku(
     has_quota_data: bool = False,
     quota_remaining: int | None = None,
     vcpus: int = 0,
-) -> tuple[float, str, list[str]]:
-    """Compute a heuristic score, confidence bucket, and warnings list.
+) -> tuple[float, str, list[str], list[dict[str, object]]]:
+    """Compute a heuristic score, confidence bucket, warnings, and breakdown.
 
     Parameters
     ----------
@@ -122,28 +122,53 @@ def score_sku(
 
     Returns
     -------
-    tuple[float, str, list[str]]
-        ``(score, confidence, warnings)`` where score is 0–100,
-        confidence is ``"high"`` / ``"medium"`` / ``"low"``.
+    tuple[float, str, list[str], list[dict[str, object]]]
+        ``(score, confidence, warnings, breakdown)`` where score is 0–100,
+        confidence is ``"high"`` / ``"medium"`` / ``"low"``, and breakdown
+        is a list of ``{"label", "points", "applied"}`` dicts.
     """
     score = _BASE_SCORE
     warnings: list[str] = []
+    breakdown: list[dict[str, object]] = []
     capabilities = sku.get("capabilities", {})
     zones = sku.get("zones", [])
 
+    # --- Base score ---
+    breakdown.append({"label": "Base", "points": _BASE_SCORE, "applied": True})
+
     # --- Zone support ---
-    if zones:
+    has_zones = bool(zones)
+    if has_zones:
         score += _ZONE_BONUS
-        if len(zones) >= 3:
-            score += _MULTI_ZONE_BONUS
-    elif require_zones:
+    breakdown.append({"label": "Zone support", "points": _ZONE_BONUS, "applied": has_zones})
+
+    has_multi_zone = len(zones) >= 3
+    if has_multi_zone:
+        score += _MULTI_ZONE_BONUS
+    breakdown.append(
+        {
+            "label": "Multi-zone (\u22653)",
+            "points": _MULTI_ZONE_BONUS,
+            "applied": has_multi_zone,
+        }
+    )
+
+    if not has_zones and require_zones:
         score += _NO_ZONE_PENALTY
         warnings.append("Zone support required but not available for this SKU in this region")
+    breakdown.append(
+        {
+            "label": "No zones (required)",
+            "points": _NO_ZONE_PENALTY,
+            "applied": not has_zones and require_zones,
+        }
+    )
 
     # --- VMSS support ---
     # All SKUs returned by the AKS VM SKUs API support VMSS-based node pools.
     if require_vmss:
         score += _VMSS_BONUS
+    breakdown.append({"label": "VMSS support", "points": _VMSS_BONUS, "applied": require_vmss})
 
     # --- Capabilities richness ---
     caps_present = sum(
@@ -158,23 +183,49 @@ def score_sku(
         )
         if k in capabilities
     )
-    if caps_present >= 4:
+    rich_caps = caps_present >= 4
+    if rich_caps:
         score += _RICH_CAPS_BONUS
+    breakdown.append(
+        {
+            "label": "Rich capabilities",
+            "points": _RICH_CAPS_BONUS,
+            "applied": rich_caps,
+        }
+    )
 
     # --- Preferred family bonus ---
     sku_name = sku.get("name", "")
-    if any(sku_name.startswith(p) for p in _PREFERRED_PREFIXES):
+    preferred = any(sku_name.startswith(p) for p in _PREFERRED_PREFIXES)
+    if preferred:
         score += _PREFERRED_FAMILY_BONUS
+    breakdown.append(
+        {
+            "label": "Preferred family",
+            "points": _PREFERRED_FAMILY_BONUS,
+            "applied": preferred,
+        }
+    )
 
     # --- Restrictions penalty ---
-    if _has_zone_restriction(sku):
+    has_restriction = _has_zone_restriction(sku)
+    if has_restriction:
         score += _RESTRICTION_PENALTY
         warnings.append("SKU has zone-level restrictions in this region")
+    breakdown.append(
+        {
+            "label": "Zone restrictions",
+            "points": _RESTRICTION_PENALTY,
+            "applied": has_restriction,
+        }
+    )
 
     # --- Quota enrichment ---
+    quota_ok = False
     if has_quota_data:
         if quota_remaining is not None and quota_remaining >= vcpus:
             score += _QUOTA_BONUS
+            quota_ok = True
         elif quota_remaining is not None and quota_remaining < vcpus:
             warnings.append(
                 f"Insufficient quota: {quota_remaining} vCPUs remaining, "
@@ -182,12 +233,27 @@ def score_sku(
             )
     else:
         warnings.append("Quota data not available — provide subscription_id for enrichment")
+    breakdown.append(
+        {
+            "label": "Quota sufficient",
+            "points": _QUOTA_BONUS,
+            "applied": quota_ok,
+        }
+    )
 
     # --- Unsuitable family penalty ---
     family = sku.get("family", "")
-    if family in _UNSUITABLE_FAMILIES:
+    unsuitable = family in _UNSUITABLE_FAMILIES
+    if unsuitable:
         score += _UNSUITABLE_PENALTY
         warnings.append(f"SKU family '{family}' may not be suitable for general AKS workloads")
+    breakdown.append(
+        {
+            "label": "Unsuitable family",
+            "points": _UNSUITABLE_PENALTY,
+            "applied": unsuitable,
+        }
+    )
 
     # Clamp score to [0, 100]
     score = max(0.0, min(100.0, score))
@@ -200,7 +266,7 @@ def score_sku(
     else:
         confidence = "low"
 
-    return round(score, 1), confidence, warnings
+    return round(score, 1), confidence, warnings, breakdown
 
 
 # ---------------------------------------------------------------------------

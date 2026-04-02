@@ -343,27 +343,30 @@ class TestRecommendationsWithMock:
 class TestScoring:
     def test_high_confidence_sku(self) -> None:
         sku = SAMPLE_SKUS[0]  # Standard_D4s_v5 — zones, rich caps
-        score, confidence, warnings = score_sku(
+        score, confidence, warnings, breakdown = score_sku(
             sku, has_quota_data=True, quota_remaining=80, vcpus=4
         )
         assert score > 0
         assert confidence in ("high", "medium", "low")
         assert isinstance(warnings, list)
+        assert isinstance(breakdown, list)
+        assert len(breakdown) > 0
+        assert all("label" in b and "points" in b and "applied" in b for b in breakdown)
 
     def test_restricted_sku_penalised(self) -> None:
         sku = SAMPLE_SKUS[1]  # Standard_F4s_v2 — has restrictions
-        score_restricted, _, _ = score_sku(sku)
+        score_restricted, _, _, _ = score_sku(sku)
         sku_clean = {**sku, "restrictions": []}
-        score_clean, _, _ = score_sku(sku_clean)
+        score_clean, _, _, _ = score_sku(sku_clean)
         assert score_restricted < score_clean
 
     def test_no_zones_with_require_zones(self) -> None:
         sku = SAMPLE_SKUS[2]  # Standard_B2s — no zones
-        _, _, warnings = score_sku(sku, require_zones=True)
+        _, _, warnings, _ = score_sku(sku, require_zones=True)
         assert any("zone" in w.lower() for w in warnings)
 
     def test_score_clamped(self) -> None:
-        score, _, _ = score_sku(SAMPLE_SKUS[0])
+        score, _, _, _ = score_sku(SAMPLE_SKUS[0])
         assert 0 <= score <= 100
 
 
