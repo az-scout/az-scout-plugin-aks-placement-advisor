@@ -37,6 +37,8 @@ class SkuRecommendation:
     pricing_currency: str = "USD"
     # Deployment confidence (from enrich_skus_with_confidence)
     deployment_confidence: dict[str, object] | None = None
+    # AKS score breakdown (from scoring.score_sku)
+    score_breakdown: list[dict[str, object]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
         """Serialise to a JSON-compatible dict with camelCase keys."""
@@ -56,6 +58,7 @@ class SkuRecommendation:
             "quotaUsed": self.quota_used,
             "score": self.score,
             "confidence": self.confidence,
+            "scoreBreakdown": self.score_breakdown,
             "warnings": self.warnings,
             "fallbackSkus": self.fallback_skus,
             "aks": {
