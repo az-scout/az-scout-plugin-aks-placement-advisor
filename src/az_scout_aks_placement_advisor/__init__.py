@@ -53,7 +53,7 @@ class AksPlacementAdvisorPlugin:
         return [
             TabDefinition(
                 id="aks-placement-advisor",
-                label="AKS Placement",
+                label="AKS SKUs",
                 icon="bi bi-diagram-3",
                 js_entry="js/aks-placement-advisor-tab.js",
                 css_entry="css/aks-placement-advisor.css",
@@ -61,8 +61,10 @@ class AksPlacementAdvisorPlugin:
         ]
 
     def get_chat_modes(self) -> list[ChatMode] | None:
-        """Return chat mode definitions, or None to skip."""
-        return None
+        """Return chat mode definitions."""
+        from az_scout_aks_placement_advisor.chat_mode import AKS_CHAT_MODE
+
+        return [AKS_CHAT_MODE]
 
     def get_navbar_actions(self) -> list[NavbarAction] | None:
         """Return navbar action definitions, or None to skip."""

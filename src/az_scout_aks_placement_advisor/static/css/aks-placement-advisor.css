@@ -1,96 +1,116 @@
-/* AKS Placement Advisor plugin styles */
+/* AKS SKU Plugin – Tab styles */
 
-.aks-placement-advisor-card {
-    padding: 0.5rem;
+/* Pool type toggle group */
+.aks-pool-toggle {
+    display: inline-flex;
+    gap: 0;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    overflow: hidden;
 }
-
-.aks-placement-advisor-card h6 {
-    color: var(--bs-primary);
-    margin-bottom: 0.5rem;
+.aks-pool-toggle input[type="radio"] {
+    display: none;
 }
-
-/* Results table */
-.aks-pa-table {
-    width: 100%;
-    border-collapse: collapse;
+.aks-pool-toggle label {
+    padding: 0.25rem 0.75rem;
     font-size: 0.85rem;
-}
-
-.aks-pa-table th,
-.aks-pa-table td {
-    padding: 0.4rem 0.6rem;
-    text-align: left;
-    border-bottom: 1px solid var(--bs-border-color);
-}
-
-.aks-pa-table th {
+    cursor: pointer;
     background: var(--bs-tertiary-bg);
-    font-weight: 600;
-    white-space: nowrap;
+    color: var(--bs-body-color);
+    border-right: 1px solid var(--bs-border-color);
+    transition: background-color 0.15s, color 0.15s;
 }
-
-.aks-pa-table tr:hover {
-    background: var(--bs-tertiary-bg);
+.aks-pool-toggle label:last-child {
+    border-right: none;
 }
-
-/* Confidence badges */
-.aks-pa-confidence-high {
-    color: var(--bs-success);
-    font-weight: 600;
-}
-
-.aks-pa-confidence-medium {
-    color: var(--bs-warning);
-    font-weight: 600;
-}
-
-.aks-pa-confidence-low {
-    color: var(--bs-danger);
-    font-weight: 600;
-}
-
-/* Score bar */
-.aks-pa-score-bar {
-    display: inline-block;
-    height: 8px;
-    border-radius: 4px;
+.aks-pool-toggle input[type="radio"]:checked + label {
     background: var(--bs-primary);
+    color: #fff;
+}
+.aks-pool-toggle-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.aks-pool-toggle-disabled label {
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+/* Issues cell – wrap badges */
+.aks-issues-cell {
+    max-width: 350px;
+}
+.aks-issues-cell .badge {
+    font-size: 0.72rem;
+    font-weight: 500;
+    white-space: normal;
+    text-align: left;
+}
+
+/* Summary bar */
+#aks-sku-summary {
+    font-size: 0.85rem;
+    color: var(--bs-secondary-color);
+}
+
+/* Price cells – right-aligned mono */
+#aks-sku-table .price-cell {
+    text-align: right;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.78rem;
+}
+
+/*
+ * Table, filter row, and SKU name button styles are inherited from:
+ *   - planner.css (.sku-table, .sku-name-btn)
+ *   - data-filters.js (.datatable-filter-row, .datatable-column-filter)
+ * If this plugin runs without the planner, provide fallback definitions:
+ */
+
+/* Fallback: sku-table (matches planner) */
+.sku-table {
+    font-size: 0.82rem;
+}
+.sku-table th {
+    white-space: nowrap;
     vertical-align: middle;
-    margin-right: 0.3rem;
 }
 
-/* Warnings list */
-.aks-pa-warnings {
+/* Fallback: filter row (matches data-filters.js expectations) */
+.datatable-filter-row td {
+    padding: 0.2rem 0.25rem;
+}
+.datatable-column-filter {
+    width: 100%;
+    padding: 0.15rem 0.35rem;
+    font-size: 0.78rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+.datatable-column-filter:focus {
+    border-color: var(--az-blue, #0078d4);
+    box-shadow: 0 0 0 0.15rem rgba(0, 120, 212, 0.2);
+    outline: none;
+}
+.datatable-column-filter::placeholder {
+    color: var(--bs-secondary-color);
+    opacity: 0.6;
     font-size: 0.75rem;
-    color: var(--bs-secondary);
-    margin: 0;
-    padding-left: 1rem;
 }
 
-/* Zone badges */
-.aks-pa-zone-badge {
-    display: inline-block;
-    background: var(--bs-info-bg-subtle);
-    color: var(--bs-info-text-emphasis);
-    border-radius: 0.25rem;
-    padding: 0 0.3rem;
-    font-size: 0.75rem;
-    margin-right: 0.15rem;
+/* Fallback: SKU name button */
+.sku-name-btn {
+    background: none;
+    border: none;
+    color: var(--az-blue, #0078d4);
+    cursor: pointer;
+    padding: 0;
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-style: dotted;
 }
-
-/* Empty state */
-.aks-pa-empty {
-    text-align: center;
-    padding: 2rem;
-    color: var(--bs-secondary);
-}
-
-/* Dark mode adjustments */
-[data-theme="dark"] .aks-pa-table th {
-    background: var(--bs-dark-bg-subtle);
-}
-
-[data-theme="dark"] .aks-pa-zone-badge {
-    background: var(--bs-info-bg-subtle);
-    color: var(--bs-info-text-emphasis);
+.sku-name-btn:hover {
+    text-decoration-style: solid;
 }

@@ -10,6 +10,7 @@ For authenticated Azure ARM API calls, use the public helpers::
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from az_scout_aks_placement_advisor.models import DISCLAIMER
@@ -23,7 +24,7 @@ def recommend_aks_skus(
     max_results: int = 10,
     tenant_id: str | None = None,
     subscription_id: str | None = None,
-) -> dict[str, Any]:
+) -> str:
     """Recommend VM SKUs suitable for AKS node pools in a given Azure region.
 
     Returns the top-ranked SKUs with a heuristic confidence score based on
@@ -52,8 +53,8 @@ def recommend_aks_skus(
 
     Returns
     -------
-    dict
-        Contains ``region``, ``count``, ``disclaimer``, and
+    str
+        JSON string containing ``region``, ``count``, ``disclaimer``, and
         ``recommendations`` (list of scored SKU dicts).
     """
     from az_scout_aks_placement_advisor.service import get_recommendations
@@ -68,12 +69,15 @@ def recommend_aks_skus(
         min_memory_gb=min_memory_gb,
         max_results=max_results,
     )
-    return {
-        "region": region,
-        "count": len(recs),
-        "disclaimer": DISCLAIMER,
-        "recommendations": [r.to_dict() for r in recs],
-    }
+    return json.dumps(
+        {
+            "region": region,
+            "count": len(recs),
+            "disclaimer": DISCLAIMER,
+            "recommendations": [r.to_dict() for r in recs],
+        },
+        indent=2,
+    )
 
 
 def compare_aks_regions(
@@ -82,7 +86,7 @@ def compare_aks_regions(
     min_memory_gb: float | None = None,
     tenant_id: str | None = None,
     subscription_id: str | None = None,
-) -> dict[str, Any]:
+) -> str:
     """Compare multiple Azure regions for AKS SKU placement suitability.
 
     For each region, retrieves the top 5 recommended SKUs and returns a
@@ -106,8 +110,8 @@ def compare_aks_regions(
 
     Returns
     -------
-    dict
-        Contains ``disclaimer``, ``regionsCompared``, ``results``
+    str
+        JSON string containing ``disclaimer``, ``regionsCompared``, ``results``
         (list of per-region summaries), and ``errors``.
     """
     from az_scout_aks_placement_advisor.service import get_recommendations
@@ -141,9 +145,12 @@ def compare_aks_regions(
     # Sort regions by best score descending
     region_results.sort(key=lambda r: -r["bestScore"])
 
-    return {
-        "disclaimer": DISCLAIMER,
-        "regionsCompared": len(regions),
-        "results": region_results,
-        "errors": errors,
-    }
+    return json.dumps(
+        {
+            "disclaimer": DISCLAIMER,
+            "regionsCompared": len(regions),
+            "results": region_results,
+            "errors": errors,
+        },
+        indent=2,
+    )
