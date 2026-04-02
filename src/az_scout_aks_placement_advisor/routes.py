@@ -46,6 +46,7 @@ async def recommendations(
     min_memory_gb: float | None = None,
     sku_name_filter: str | None = None,
     max_results: int = 20,
+    pool_type: str = "system",
 ) -> dict[str, Any]:
     """Return scored AKS SKU recommendations for a region.
 
@@ -73,6 +74,7 @@ async def recommendations(
         min_memory_gb=min_memory_gb,
         sku_name_filter=sku_name_filter,
         max_results=max_results,
+        pool_type=pool_type,
     )
     return {
         "region": region,

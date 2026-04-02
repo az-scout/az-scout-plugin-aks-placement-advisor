@@ -198,6 +198,7 @@ def get_recommendations(
     min_memory_gb: float | None = None,
     sku_name_filter: str | None = None,
     max_results: int = 20,
+    pool_type: str = "system",
 ) -> list[SkuRecommendation]:
     """Build scored AKS SKU recommendations for a region.
 
@@ -323,6 +324,11 @@ def get_recommendations(
 
         fallbacks = suggest_fallbacks(sku.get("name", ""), all_names)
 
+        # AKS eligibility check (system vs user pool rules + VMSS warnings)
+        from az_scout_aks_placement_advisor._aks_filter import check_aks_eligibility
+
+        eligibility = check_aks_eligibility(sku, pool_type)
+
         rec = SkuRecommendation(
             sku_name=sku.get("name", ""),
             region=region,
@@ -332,13 +338,17 @@ def get_recommendations(
             vcpus=vcpus,
             memory_gb=memory_gb,
             zones=zones,
-            vmss_supported=True,  # AKS API confirms VMSS support
-            aks_compatible=True,  # confirmed by AKS VM SKUs API
+            vmss_supported=True,
+            aks_compatible=True,
             quota_available=quota_remaining,
             score=score_val,
             confidence=confidence,
             warnings=warnings,
             fallback_skus=fallbacks,
+            eligibility_status=eligibility.status,
+            eligibility_errors=eligibility.errors,
+            eligibility_warnings=eligibility.warnings,
+            pool_type=pool_type,
         )
         recommendations.append(rec)
 

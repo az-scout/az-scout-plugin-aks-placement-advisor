@@ -24,6 +24,11 @@ class SkuRecommendation:
     confidence: str
     warnings: list[str] = field(default_factory=list)
     fallback_skus: list[str] = field(default_factory=list)
+    # AKS eligibility (from _aks_filter)
+    eligibility_status: str = "eligible"  # eligible | warning | ineligible
+    eligibility_errors: list[str] = field(default_factory=list)
+    eligibility_warnings: list[str] = field(default_factory=list)
+    pool_type: str = "system"
 
     def to_dict(self) -> dict[str, object]:
         """Serialise to a JSON-compatible dict with camelCase keys."""
@@ -43,6 +48,13 @@ class SkuRecommendation:
             "confidence": self.confidence,
             "warnings": self.warnings,
             "fallbackSkus": self.fallback_skus,
+            "aks": {
+                "status": self.eligibility_status,
+                "eligible": self.eligibility_status != "ineligible",
+                "pool_type": self.pool_type,
+                "errors": self.eligibility_errors,
+                "warnings": self.eligibility_warnings,
+            },
         }
 
 
