@@ -4,14 +4,19 @@ Evaluates and recommends VM SKUs for AKS node pools, with heuristic
 scoring for zone support, VMSS suitability, and quota availability.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from az_scout.plugin_api import ChatMode, NavbarAction, TabDefinition, get_plugin_logger
-from fastapi import APIRouter
+from az_scout.plugin_api import get_plugin_logger
+
+if TYPE_CHECKING:
+    from az_scout.plugin_api import ChatMode, NavbarAction, TabDefinition
+    from fastapi import APIRouter
 
 logger = get_plugin_logger("aks-placement-advisor")
 
@@ -50,6 +55,8 @@ class AksPlacementAdvisorPlugin:
 
     def get_tabs(self) -> list[TabDefinition] | None:
         """Return UI tab definitions."""
+        from az_scout.plugin_api import TabDefinition
+
         return [
             TabDefinition(
                 id="aks-placement-advisor",

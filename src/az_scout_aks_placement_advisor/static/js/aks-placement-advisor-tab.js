@@ -429,7 +429,7 @@
     function openSkuDetail(skuName) {
         const enriched = (lastSkus || []).find(function (s) { return s.name === skuName; }) || {};
         C.showSkuDetailModal(skuName, {
-            region: el("region-select").value,
+            region: (el("region-select") || {}).value || "",
             subscriptionId: el("aks-sub-select").value,
             enrichedSku: enriched,
             prependSections: function (_data, _enriched) {
