@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, get_type_hints
 from unittest.mock import patch
 
 import pytest
@@ -461,6 +461,13 @@ class TestMCPTools:
 
 
 class TestPluginRegistration:
+    def test_plugin_class_has_typed_name_and_version(self) -> None:
+        from az_scout_aks_placement_advisor import AksPlacementAdvisorPlugin
+
+        hints = get_type_hints(AksPlacementAdvisorPlugin)
+        assert hints["name"] is str
+        assert hints["version"] is str
+
     def test_plugin_instance_exists(self) -> None:
         from az_scout_aks_placement_advisor import plugin
 
