@@ -31,8 +31,8 @@ except PackageNotFoundError:
 class AksPlacementAdvisorPlugin:
     """AKS Placement Advisor az-scout plugin."""
 
-    name = "aks-placement-advisor"
-    version = __version__
+    name: str = "aks-placement-advisor"
+    version: str = __version__
 
     def get_router(self) -> APIRouter | None:
         """Return API routes mounted at /plugins/aks-placement-advisor/."""
