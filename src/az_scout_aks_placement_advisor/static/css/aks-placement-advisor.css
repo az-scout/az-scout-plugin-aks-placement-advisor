@@ -48,13 +48,13 @@
 }
 
 /* Summary bar */
-#aks-sku-summary {
+#aks-pa-summary {
     font-size: 0.85rem;
     color: var(--bs-secondary-color);
 }
 
 /* Price cells – right-aligned mono */
-#aks-sku-table .price-cell {
+#aks-pa-table .price-cell {
     text-align: right;
     font-family: var(--bs-font-monospace);
     font-size: 0.78rem;

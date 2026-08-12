@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import OrderedDict
 from typing import Any
 
 from az_scout_aks_placement_advisor.models import SkuRecommendation
@@ -44,7 +45,8 @@ _AKS_VM_SKUS_API_VERSION = "2026-01-02-preview"
 # ---------------------------------------------------------------------------
 
 _CACHE_TTL = 600  # 10 minutes
-_result_cache: dict[str, tuple[float, list[SkuRecommendation]]] = {}
+_CACHE_MAX_SIZE = 256  # maximum number of unique query combinations to retain
+_result_cache: OrderedDict[str, tuple[float, list[SkuRecommendation]]] = OrderedDict()
 
 
 def _cache_key(
@@ -244,6 +246,7 @@ def get_recommendations(
         ts, data = cached
         if now - ts < _CACHE_TTL:
             logger.debug("Cache HIT for %s (%d items)", key, len(data))
+            _result_cache.move_to_end(key)  # mark as recently used
             return data[:max_results] if max_results else data
 
     # --- Fetch AKS VM SKUs ---
@@ -397,8 +400,10 @@ def get_recommendations(
     # Sort by score descending, then by name for stability
     recommendations.sort(key=lambda r: (-r.score, r.sku_name))
 
-    # Store in cache (full list) and return truncated
+    # Store in cache (full list); evict the oldest entry when at capacity
     _result_cache[key] = (time.monotonic(), recommendations)
+    if len(_result_cache) > _CACHE_MAX_SIZE:
+        _result_cache.popitem(last=False)
     return recommendations[:max_results] if max_results else recommendations
 
 
